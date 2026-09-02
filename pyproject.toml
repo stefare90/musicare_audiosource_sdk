@@ -17,3 +17,7 @@ dependencies = []
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["musicare_sdk*"]
+
+[project.scripts]
+musicare-build = "musicare_sdk.builder:build_plugin"
+musicare-play = "musicare_sdk.player:main"
