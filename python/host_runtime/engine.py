@@ -1,5 +1,6 @@
 import sys
-import importlib
+import os
+import importlib.util
 import traceback
 from typing import Optional
 from flask import Flask, request, jsonify
@@ -8,17 +9,11 @@ from musicare_plugin_sdk import Track, BaseAudioSourcePlugin
 
 
 def create_app() -> Flask:
-    """
-    Creates and configures the Flask host RPC daemon application.
-    """
     app = Flask(__name__)
     active_plugin: Optional[BaseAudioSourcePlugin] = None
 
     @app.route('/ping', methods=['GET'])
     def ping():
-        """
-        Health-check endpoint returning the daemon state and active plugin metadata.
-        """
         nonlocal active_plugin
         return jsonify({
             "status": "ready",
@@ -32,33 +27,46 @@ def create_app() -> Flask:
     @app.route('/load_plugin', methods=['POST'])
     def load_plugin():
         """
-        Dynamically loads an unzipped plugin directory into memory by executing get_plugin().
+        Dynamically loads an unzipped plugin directory by loading its entrypoint
+        via explicit file location to avoid namespace collisions with host's main.py.
         """
         nonlocal active_plugin
         try:
             data = request.get_json(force=True)
             plugin_dir = data.get('plugin_dir')
-            module_name = data.get('module_name', 'main')
 
-            if not plugin_dir:
-                return jsonify({"error": "Missing required 'plugin_dir' parameter"}), 400
+            if not plugin_dir or not os.path.isdir(plugin_dir):
+                return jsonify({"error": f"Invalid or missing plugin_dir: {plugin_dir}"}), 400
 
-            # 1. Add the extracted plugin directory to the head of sys.path
+            # 1. Add the plugin directory to sys.path so it can import its local files (plugin.py, extractor.py)
             if plugin_dir not in sys.path:
                 sys.path.insert(0, plugin_dir)
 
-            # 2. Dynamically import the entry-point module (defaults to 'main.py')
-            plugin_module = importlib.import_module(module_name)
+            # 2. Locate the plugin's entry point file
+            entry_file = os.path.join(plugin_dir, "main.py")
+            if not os.path.exists(entry_file):
+                entry_file = os.path.join(plugin_dir, "plugin.py")
+            if not os.path.exists(entry_file):
+                raise FileNotFoundError(f"Neither main.py nor plugin.py found in '{plugin_dir}'")
 
-            # 3. Invoke the standard factory function: get_plugin()
+            # 3. Load the entrypoint explicitly without colliding with host_runtime/main.py!
+            spec = importlib.util.spec_from_file_location("dynamic_plugin_entry", entry_file)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Could not load spec for '{entry_file}'")
+
+            plugin_module = importlib.util.module_from_spec(spec)
+            sys.modules["dynamic_plugin_entry"] = plugin_module
+            spec.loader.exec_module(plugin_module)
+
+            # 4. Invoke the factory function: get_plugin()
             if not hasattr(plugin_module, 'get_plugin'):
                 raise AttributeError(
-                    f"Entry-point module '{module_name}' must expose a factory function 'get_plugin()'."
+                    f"Entry-point '{entry_file}' must expose a factory function 'get_plugin()'."
                 )
 
             instance = plugin_module.get_plugin()
 
-            # 4. Strict contract verification against the SDK base class
+            # 5. Contract verification
             if not isinstance(instance, BaseAudioSourcePlugin):
                 raise TypeError(
                     f"Plugin instance '{type(instance).__name__}' does not inherit from BaseAudioSourcePlugin."
@@ -79,9 +87,6 @@ def create_app() -> Flask:
 
     @app.route('/get_stream', methods=['POST'])
     def get_stream():
-        """
-        Resolves track metadata into an ordered list of playable audio stream sources.
-        """
         nonlocal active_plugin
         if not active_plugin:
             return jsonify({"error": "No plugin currently loaded. Call /load_plugin first."}), 400
@@ -91,10 +96,7 @@ def create_app() -> Flask:
             track_dict = data.get('track', {})
             quality = data.get('quality', 'high')
 
-            # Parse track payload into SDK domain model
             track = Track.from_dict(track_dict)
-
-            # Execute plugin stream resolution
             sources = active_plugin.get_stream(track, quality)
 
             return jsonify([s.to_dict() for s in sources]), 200
@@ -107,9 +109,6 @@ def create_app() -> Flask:
 
 
 def start_daemon(port: int = 9765) -> None:
-    """
-    Starts the blocking Flask server daemon on all interfaces.
-    """
     print(f"🐍 [HOST] Starting fixed audio source daemon on 0.0.0.0:{port}...", flush=True)
     app = create_app()
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
