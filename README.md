@@ -23,7 +23,7 @@ pip install git+https://github.com/your-org/musicare_audiosource_sdk.git
 ## 🚀 Quickstart
 
 ```python
-from musicare_sdk import (
+from musicare_plugin_sdk import (
     BaseAudioSourcePlugin,
     Track,
     AudioQuality,
