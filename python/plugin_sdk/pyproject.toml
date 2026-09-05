@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "musicare-audiosource-sdk"
+name = "musicare-plugin-sdk"
 version = "1.0.0"
 description = "Pure Python SDK and contracts for MusicAre Audio Source Plugins."
 readme = "README.md"
@@ -14,10 +14,10 @@ authors = [
 ]
 dependencies = []
 
+[project.scripts]
+musicare-build = "musicare_plugin_sdk.builder:build_plugin"
+musicare-play = "musicare_plugin_sdk.player:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["musicare_sdk*"]
-
-[project.scripts]
-musicare-build = "musicare_sdk.builder:build_plugin"
-musicare-play = "musicare_sdk.player:main"
+include = ["musicare_plugin_sdk*"]

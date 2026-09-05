@@ -1,7 +1,13 @@
+# ==============================================================================
+# 1. PYTHON (Virtual environments, caches & packaging artifacts)
+# ==============================================================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+*.pyd
+*.dylib
+*.dll
 .Python
 build/
 develop-eggs/
@@ -18,10 +24,61 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-.env
-.venv
+
+# Virtual Environments
+.venv/
 env/
 venv/
 ENV/
-.vscode/
+env.bak/
+venv.bak/
+
+# SeriousPython / Staging / Plugin build artifacts
+build_plugin_temp/
+site-packages/
+python-app/
+*.log
+python_debug.log
+python_daemon.log
+plugin.zip
+
+
+# ==============================================================================
+# 2. DART & FLUTTER (Generated files & tool caches)
+# ==============================================================================
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+
+
+# ==============================================================================
+# 3. ANDROID (Gradle, local machine properties & build artifacts)
+# ==============================================================================
+**/android/.gradle/
+.gradle/
+**/android/local.properties
+**/android/app/build/
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+*.apk
+*.aab
+
+
+# ==============================================================================
+# 4. LINUX DESKTOP (Flutter native ephemeral files)
+# ==============================================================================
+**/linux/flutter/ephemeral/
+
+
+# ==============================================================================
+# 5. IDEs, EDITORS & OS ARTIFACTS
+# ==============================================================================
 .idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.DS_Store
+Thumbs.db
