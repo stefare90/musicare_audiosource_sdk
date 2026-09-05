@@ -19,14 +19,11 @@ fi
 
 PORT=8888
 
-# 🎯 1. Avvia il server HTTP nativo in DART (zero dipendenze esterne!)
 dart run tool/serve_file.dart "$PLUGIN_ZIP_ABS" $PORT &
 HTTP_PID=$!
 
-# Assicura che il server Dart venga terminato all'uscita
 trap "kill $HTTP_PID 2>/dev/null || true; adb -s $DEVICE reverse --remove-all 2>/dev/null || true" EXIT
 
-# Attendi mezzo secondo che il server Dart sia in ascolto
 sleep 0.5
 
 PLATFORM="Linux"
@@ -42,14 +39,12 @@ echo "=================================================="
 rm -rf build/python-app build/site-packages build/host_staging
 mkdir -p build/python-app build/site-packages build/host_staging
 
-# Copia i sorgenti dell'Host e dell'SDK nella cartella di staging
 cp -r ../../python/host_runtime/* build/host_staging/
 cp -r ../../python/plugin_sdk/musicare_plugin_sdk build/host_staging/
 
 export SERIOUS_PYTHON_SITE_PACKAGES=$(pwd)/build/site-packages
 export SERIOUS_PYTHON_APP=$(pwd)/build/python-app
 
-# SeriousPython pacchettizza l'host
 dart run serious_python:main package build/host_staging \
   -p $PLATFORM \
   -r -r -r ../../python/host_runtime/requirements.txt \
