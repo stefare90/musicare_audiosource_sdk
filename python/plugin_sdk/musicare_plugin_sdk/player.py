@@ -9,11 +9,16 @@ def run_player(
     artist: str = "The Beatles",
     title: str = "Come Together",
     quality: str = "high",
-    plugin_module_path: str = "src.main",
+    plugin_module_path: str = "main",
 ):
-    # Ensure current working directory is in sys.path to find the local plugin
+    # Ensure the 'src' directory is in sys.path to simulate host runtime environment
     cwd = os.getcwd()
-    if cwd not in sys.path:
+    src_path = os.path.join(cwd, "src")
+    
+    if os.path.exists(src_path) and src_path not in sys.path:
+        sys.path.insert(0, src_path)
+    elif cwd not in sys.path:
+        # Fallback if run directly inside the src directory
         sys.path.insert(0, cwd)
 
     # 1. Load the local plugin using the standard factory
