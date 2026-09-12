@@ -138,15 +138,10 @@ def build_plugin(
         else:
             print("ℹ️ 3. No requirements.txt found, skipping dependency installation.")
 
-        # 5. Copy source files into bundle root
+        # 5. Copy source package into bundle preserving src/ directory
         print("📄 4. Staging plugin sources...")
-        for item in os.listdir(source_dir):
-            src_path = os.path.join(source_dir, item)
-            dst_path = os.path.join(build_dir, item)
-            if os.path.isdir(src_path):
-                shutil.copytree(src_path, dst_path)
-            else:
-                shutil.copy2(src_path, dst_path)
+        dst_src_dir = os.path.join(build_dir, source_dir)
+        shutil.copytree(source_dir, dst_src_dir)
 
         # 6. Copy manifest to bundle root
         shutil.copy(manifest_file, build_dir)
