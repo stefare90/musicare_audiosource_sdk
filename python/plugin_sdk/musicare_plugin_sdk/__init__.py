@@ -1,5 +1,5 @@
 from .base_plugin import BaseAudioSourcePlugin
-from .types import (
+from .models import (
     AudioQuality,
     AudioStreamResponse,
     CandidateTrack,

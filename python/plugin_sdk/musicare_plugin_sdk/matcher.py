@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import List
-from .types import Track
+from .models import Track
 
 
 @dataclass

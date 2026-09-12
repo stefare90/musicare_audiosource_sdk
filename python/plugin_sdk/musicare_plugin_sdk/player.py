@@ -2,14 +2,14 @@ import sys
 import os
 import subprocess
 import importlib
-from .types import Track, Artist
+from .models import Track, AudioQuality
 
 
 def run_player(
     artist: str = "The Beatles",
     title: str = "Come Together",
     quality: str = "high",
-    plugin_module_path: str = "main",
+    plugin_module_path: str = "src.main",
 ):
     # Ensure the 'src' directory is in sys.path to simulate host runtime environment
     cwd = os.getcwd()
@@ -32,29 +32,40 @@ def run_player(
     print(f"\n🎧 [MusicAre Test Player] Testing plugin: '{plugin.name}' (v{plugin.version})")
     print(f"🔍 Resolving stream for: {artist} - {title} (Quality: {quality})...\n")
 
-    track = Track(name=title, artists=[Artist(name=artist)], duration_ms=0)
+    track = Track(name=title, artists=[artist] if artist else [], duration_ms=0)
+    target_quality = AudioQuality.from_string(quality)
 
     try:
-        sources = plugin.get_stream(track, quality)
+        candidates = plugin.search_candidates(track)
+    except Exception as e:
+        print(f"❌ Candidate search failed: {e}")
+        return
+
+    if not candidates:
+        print("⚠️ No audio stream candidates returned by the plugin.")
+        return
+
+    print(f"✅ Found {len(candidates)} candidate(s):\n")
+    for idx, c in enumerate(candidates, start=1):
+        dur = f"{c.duration_ms//1000//60:02d}:{c.duration_ms//1000%60:02d}" if c.duration_ms else "--:--"
+        print(f"--- [Candidate #{idx}] {c.title} (by {c.artist or 'Unknown'}) [{dur}] - ID: {c.id} ---")
+
+    primary_candidate = candidates[0]
+    print(f"\n⚡ Resolving stream for primary candidate: '{primary_candidate.title}'...")
+
+    try:
+        primary_source = plugin.resolve_stream(primary_candidate.id, target_quality)
     except Exception as e:
         print(f"❌ Stream resolution failed: {e}")
         return
 
-    if not sources:
-        print("⚠️ No audio stream candidates returned by the plugin.")
-        return
-
-    print(f"✅ Found {len(sources)} candidate stream(s):\n")
-    for idx, s in enumerate(sources, start=1):
-        bitrate_kbps = round((s.bitrate or 0) / 1000)
-        print(f"--- [Candidate #{idx}] ---")
-        print(f"Codec:   {s.codec}")
-        print(f"Bitrate: {s.bitrate} bps (~{bitrate_kbps} kbps)")
-        print(f"Expires: {s.expires_at}")
-        print(f"URL:     {s.url}\n")
+    bitrate_kbps = round((primary_source.bitrate or 0) / 1000)
+    print(f"Codec:   {primary_source.codec}")
+    print(f"Bitrate: {primary_source.bitrate} bps (~{bitrate_kbps} kbps)")
+    print(f"Expires: {primary_source.expires_at}")
+    print(f"URL:     {primary_source.url}\n")
 
     # 2. Launch media player for Candidate #1
-    primary_source = sources[0]
     user_agent = (primary_source.headers or {}).get(
         "User-Agent",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",

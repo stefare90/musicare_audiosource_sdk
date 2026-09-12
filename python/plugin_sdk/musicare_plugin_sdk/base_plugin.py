@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
-from .types import AudioQuality, AudioStreamResponse, CandidateTrack, Track
+from .models import AudioQuality, AudioStreamResponse, CandidateTrack, Track
 
 
 class BaseAudioSourcePlugin(ABC):
