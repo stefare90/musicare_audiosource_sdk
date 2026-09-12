@@ -11,22 +11,17 @@ def run_player(
     quality: str = "high",
     plugin_module_path: str = "src.main",
 ):
-    # Ensure the 'src' directory is in sys.path to simulate host runtime environment
     cwd = os.getcwd()
-    src_path = os.path.join(cwd, "src")
-    
-    if os.path.exists(src_path) and src_path not in sys.path:
-        sys.path.insert(0, src_path)
-    elif cwd not in sys.path:
-        # Fallback if run directly inside the src directory
-        sys.path.insert(0, cwd)
+    if os.path.basename(cwd) == "src":
+        root_path = os.path.dirname(cwd)
+    else:
+        root_path = cwd
+    if root_path not in sys.path:
+        sys.path.insert(0, root_path)
 
     # 1. Load the local plugin using the standard factory
     try:
-        try:
-            main_mod = importlib.import_module(plugin_module_path)
-        except ImportError:
-            main_mod = importlib.import_module("main")
+        main_mod = importlib.import_module(plugin_module_path)
         plugin = main_mod.get_plugin()
     except Exception as e:
         print(f"❌ Error loading plugin from '{plugin_module_path}': {e}")
