@@ -111,9 +111,9 @@ void main() {
     });
 
     testWidgets(
-      'resolves stream and validates CDN playback for canonical track',
+      'resolves track and validates primary CDN stream playback',
       (tester) async {
-        final streams = await client.getStream(
+        final playback = await client.resolveTrack(
           title: 'Come Together',
           artists: ['The Beatles'],
           durationMs: 259000,
@@ -121,13 +121,26 @@ void main() {
         );
 
         expect(
-          streams,
+          playback.candidates,
           isNotEmpty,
-          reason: 'Plugin returned zero audio stream candidates',
+          reason: 'Plugin returned zero metadata candidates',
+        );
+        expect(
+          playback.activeCandidateId,
+          isNotEmpty,
+          reason: 'Plugin returned empty active candidate ID',
         );
 
-        final primaryStream = streams.first;
-        await assertPlayableCdnStream(primaryStream);
+        await assertPlayableCdnStream(playback.stream);
+
+        // Also test resolveStream explicitly for second candidate if available
+        if (playback.candidates.length > 1) {
+          final altStream = await client.resolveStream(
+            candidateId: playback.candidates[1].id,
+            quality: AudioQuality.high,
+          );
+          await assertPlayableCdnStream(altStream);
+        }
       },
     );
   });
