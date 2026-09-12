@@ -23,7 +23,10 @@ def run_player(
 
     # 1. Load the local plugin using the standard factory
     try:
-        main_mod = importlib.import_module(plugin_module_path)
+        try:
+            main_mod = importlib.import_module(plugin_module_path)
+        except ImportError:
+            main_mod = importlib.import_module("main")
         plugin = main_mod.get_plugin()
     except Exception as e:
         print(f"❌ Error loading plugin from '{plugin_module_path}': {e}")
