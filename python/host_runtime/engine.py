@@ -1,6 +1,7 @@
 import importlib.util
 import os
 import sys
+import traceback
 from typing import Optional
 
 from flask import Flask, jsonify, request
@@ -42,9 +43,9 @@ def load_plugin():
         if os.path.isdir(src_dir) and src_dir not in sys.path:
             sys.path.insert(0, src_dir)
 
-        entry_path = os.path.join(req.plugin_dir, f"{req.module_name}.py")
+        entry_path = os.path.join(src_dir, f"{req.module_name}.py")
         if not os.path.exists(entry_path):
-            entry_path = os.path.join(src_dir, f"{req.module_name}.py")
+            entry_path = os.path.join(req.plugin_dir, f"{req.module_name}.py")
 
         if not os.path.exists(entry_path):
             return jsonify({"success": False, "error": f"Entry point not found: {entry_path}"}), 400
@@ -70,8 +71,12 @@ def load_plugin():
             "version": getattr(plugin, "version", "1.0.0"),
         }), 200
     except ValueError as ve:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
         return jsonify({"success": False, "error": str(ve)}), 400
     except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -100,8 +105,12 @@ def resolve_track():
 
         return jsonify(playback.to_dict()), 200
     except ValueError as ve:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
         return jsonify({"error": str(e)}), 500
 
 
@@ -117,11 +126,17 @@ def resolve_stream():
         stream = _active_plugin.resolve_stream(req.candidate_id, req.quality)
         return jsonify(stream.to_dict()), 200
     except ValueError as ve:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
         return jsonify({"error": str(ve)}), 400
     except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
         return jsonify({"error": str(e)}), 500
 
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8765"))
-    app.run(host="127.0.0.1", port=port, debug=False)
+def start_daemon(port: Optional[int] = None, host: str = "127.0.0.1"):
+    """Start the Flask host daemon on the assigned port."""
+    if port is None:
+        port = int(os.environ.get("PORT", "8765"))
+    app.run(host=host, port=int(port), debug=False)
