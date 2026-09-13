@@ -12,7 +12,7 @@ This harness acts as the official certification testbed for third-party audio so
 1. **Archive Unpacking**: Extracts `plugin.zip` into a clean, sandboxed application directory.
 2. **Host Daemon Boot**: Stages `python/host_runtime` and launches SeriousPython on an ephemeral port.
 3. **Dynamic Injection**: Calls `POST /load_plugin` to verify dynamic import and `get_plugin()` contract adherence.
-4. **Stream Resolution**: Resolves canonical track metadata via `POST /get_stream`.
+4. **Two-Tier JIT Stream Resolution**: Resolves canonical track metadata via `POST /resolve_track` (validating candidate metadata and primary stream) and verifies on-demand resolution via `POST /resolve_stream`.
 5. **CDN Playback Handshake**: Performs an HTTP Range request (`Range: bytes=0-1024`) against upstream CDN servers (e.g. `googlevideo.com`) to confirm real audio bytes are playable.
 
 ---

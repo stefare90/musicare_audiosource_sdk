@@ -1,19 +1,30 @@
-from .types import AudioQuality, Artist, Track, AudioStreamResponse
 from .base_plugin import BaseAudioSourcePlugin
-from .matcher import CandidateTrack, TrackMatcher
-from .exceptions import MusicAreSDKException, StreamResolutionError, PluginMetadataError
-
-__version__ = "1.0.0"
+from .models import (
+    AudioQuality,
+    AudioStreamResponse,
+    CandidateTrack,
+    LoadPluginRequest,
+    ResolveStreamRequest,
+    ResolveTrackRequest,
+    ResolvedTrackPlayback,
+    Track,
+)
 
 __all__ = [
     "AudioQuality",
-    "Artist",
-    "Track",
     "AudioStreamResponse",
-    "BaseAudioSourcePlugin",
     "CandidateTrack",
-    "TrackMatcher",
-    "MusicAreSDKException",
-    "StreamResolutionError",
-    "PluginMetadataError",
+    "LoadPluginRequest",
+    "ResolveStreamRequest",
+    "ResolveTrackRequest",
+    "ResolvedTrackPlayback",
+    "Track",
+    "BaseAudioSourcePlugin",
 ]
+
+try:
+    from .matcher import TrackMatcher
+
+    __all__.append("TrackMatcher")
+except ImportError:
+    pass

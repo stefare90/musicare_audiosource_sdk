@@ -1,35 +1,35 @@
 from abc import ABC, abstractmethod
 from typing import List
-from .types import Track, AudioQuality, AudioStreamResponse
+from .models import AudioQuality, AudioStreamResponse, CandidateTrack, Track
 
 
 class BaseAudioSourcePlugin(ABC):
-    """
-    Mandatory abstract base interface for all MusicAre Audio Source plugins.
-    """
-
     @property
     @abstractmethod
     def id(self) -> str:
-        """Unique plugin reverse-DNS identifier (e.g. 'org.musicare.audiosource.youtube')."""
+        """Unique reverse-domain plugin identifier."""
         pass
 
     @property
     @abstractmethod
     def name(self) -> str:
-        """Human-readable display name for the plugin (e.g. 'MusicAre YouTube Audio Source')."""
+        """Human-readable display name of the plugin."""
         pass
 
     @property
     @abstractmethod
     def version(self) -> str:
-        """SemVer version string of the plugin (e.g. '1.0.0')."""
+        """Semantic version string of the plugin."""
         pass
 
     @abstractmethod
-    def get_stream(self, track: Track, quality: AudioQuality) -> List[AudioStreamResponse]:
-        """
-        Resolves track metadata into an ordered list of playable audio stream sources,
-        sorted descending by adherence score.
-        """
+    def search_candidates(self, track: Track) -> List[CandidateTrack]:
+        """Search platform and return lightweight metadata candidates (fast: < 0.4s)."""
+        pass
+
+    @abstractmethod
+    def resolve_stream(
+        self, candidate_id: str, quality: AudioQuality = AudioQuality.HIGH
+    ) -> AudioStreamResponse:
+        """Extract direct audio stream URL for a specific candidate_id (~0.7s)."""
         pass

@@ -20,16 +20,25 @@ pip install git+https://github.com/your-org/musicare_audiosource_sdk.git#subdire
 
 ---
 
+## ⚡ Two-Tier Just-In-Time (JIT) Resolution Lifecycle
+
+Plugins built with this SDK implement a decoupled, two-phase resolution architecture:
+1. **Phase 1: Candidate Search (`search_candidates`)**: Fast text-based search returning lightweight metadata (`CandidateTrack`: id, title, artist, duration) in **< 0.4s** without downloading media formats or running heavy deciphers.
+2. **Phase 2: JIT Stream Resolution (`resolve_stream`)**: Direct on-demand extraction of the playable CDN stream URL (`AudioStreamResponse`) in **~0.7s** executed exclusively for the single chosen `candidate_id`.
+
+---
+
 ## 🚀 Creating a Plugin
 
 Implement the `BaseAudioSourcePlugin` interface and expose the standard `get_plugin()` factory function:
 
 ```python
 from musicare_plugin_sdk import (
-    BaseAudioSourcePlugin,
-    Track,
     AudioQuality,
     AudioStreamResponse,
+    BaseAudioSourcePlugin,
+    CandidateTrack,
+    Track,
     TrackMatcher,
 )
 
@@ -47,22 +56,30 @@ class ExampleAudioSourcePlugin(BaseAudioSourcePlugin):
     def version(self) -> str:
         return "1.0.0"
 
-    def get_stream(
-        self,
-        track: Track,
-        quality: AudioQuality,
-    ) -> list[AudioStreamResponse]:
-        # 1. Search provider API
-        # 2. Score and rank candidates using TrackMatcher.rank_candidates()
-        # 3. Return resolved AudioStreamResponse items
+    def search_candidates(self, track: Track) -> list[CandidateTrack]:
+        # 1. Fast search on upstream provider (< 0.4s)
+        # 2. Return lightweight candidate metadata (id, title, artist, duration_ms)
         return [
-            AudioStreamResponse(
-                url="https://example.com/audio.m4a",
-                quality=quality,
-                codec="m4a",
-                bitrate=128000,
+            CandidateTrack(
+                id="track_12345",
+                title="Come Together",
+                artist="The Beatles",
+                duration_ms=259000,
             )
         ]
+
+    def resolve_stream(
+        self, candidate_id: str, quality: AudioQuality = AudioQuality.HIGH
+    ) -> AudioStreamResponse:
+        # Direct on-demand stream URL extraction for the given candidate ID (~0.7s)
+        return AudioStreamResponse(
+            url="https://example.com/audio.m4a",
+            quality=quality,
+            codec="m4a",
+            bitrate=160000,
+            expires_at=None,
+            headers={"User-Agent": "MusicAre/1.0.0"},
+        )
 
 
 def get_plugin() -> BaseAudioSourcePlugin:

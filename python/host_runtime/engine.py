@@ -1,114 +1,142 @@
-import sys
-import os
 import importlib.util
+import os
+import sys
 import traceback
 from typing import Optional
-from flask import Flask, request, jsonify
 
-from musicare_plugin_sdk import Track, BaseAudioSourcePlugin
+from flask import Flask, jsonify, request
+from musicare_plugin_sdk import (
+    BaseAudioSourcePlugin,
+    LoadPluginRequest,
+    ResolveStreamRequest,
+    ResolveTrackRequest,
+    ResolvedTrackPlayback,
+)
+
+app = Flask(__name__)
+
+_active_plugin: Optional[BaseAudioSourcePlugin] = None
 
 
-def create_app() -> Flask:
-    app = Flask(__name__)
-    active_plugin: Optional[BaseAudioSourcePlugin] = None
+@app.route("/ping", methods=["GET"])
+def ping():
+    return jsonify({
+        "status": "ok",
+        "plugin_loaded": _active_plugin is not None,
+        "loaded": getattr(_active_plugin, "name", None),
+    }), 200
 
-    @app.route('/ping', methods=['GET'])
-    def ping():
-        nonlocal active_plugin
+
+@app.route("/load_plugin", methods=["POST"])
+def load_plugin():
+    global _active_plugin
+    try:
+        data = request.get_json(force=True) or {}
+        req = LoadPluginRequest.from_dict(data)
+
+        if not os.path.exists(req.plugin_dir):
+            return jsonify({"success": False, "error": f"Plugin directory does not exist: {req.plugin_dir}"}), 400
+
+        if req.plugin_dir not in sys.path:
+            sys.path.insert(0, req.plugin_dir)
+        src_dir = os.path.join(req.plugin_dir, "src")
+        if os.path.isdir(src_dir) and src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+
+        entry_path = os.path.join(src_dir, f"{req.module_name}.py")
+        if not os.path.exists(entry_path):
+            entry_path = os.path.join(req.plugin_dir, f"{req.module_name}.py")
+
+        if not os.path.exists(entry_path):
+            return jsonify({"success": False, "error": f"Entry point not found: {entry_path}"}), 400
+
+        spec = importlib.util.spec_from_file_location(req.module_name, entry_path)
+        if spec is None or spec.loader is None:
+            return jsonify({"success": False, "error": f"Cannot create module spec for {entry_path}"}), 400
+
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[req.module_name] = module
+        spec.loader.exec_module(module)
+
+        if not hasattr(module, "get_plugin"):
+            return jsonify({"success": False, "error": "Entry point is missing get_plugin() factory"}), 400
+
+        plugin = module.get_plugin()
+        _active_plugin = plugin
+
         return jsonify({
-            "status": "ready",
-            "server_type": "FIXED_HOST",
-            "plugin_loaded": active_plugin is not None,
-            "id": active_plugin.id if active_plugin else None,
-            "name": active_plugin.name if active_plugin else None,
-            "version": active_plugin.version if active_plugin else None,
+            "success": True,
+            "loaded": getattr(plugin, "name", "Unknown Plugin"),
+            "id": getattr(plugin, "id", "unknown"),
+            "version": getattr(plugin, "version", "1.0.0"),
         }), 200
-
-    @app.route('/load_plugin', methods=['POST'])
-    def load_plugin():
-        """
-        Dynamically loads an unzipped plugin directory by loading its entrypoint
-        via explicit file location to avoid namespace collisions with host's main.py.
-        """
-        nonlocal active_plugin
-        try:
-            data = request.get_json(force=True)
-            plugin_dir = data.get('plugin_dir')
-
-            if not plugin_dir or not os.path.isdir(plugin_dir):
-                return jsonify({"error": f"Invalid or missing plugin_dir: {plugin_dir}"}), 400
-
-            # 1. Add the plugin directory to sys.path so it can import its local files (plugin.py, extractor.py)
-            if plugin_dir not in sys.path:
-                sys.path.insert(0, plugin_dir)
-
-            # 2. Locate the plugin's entry point file
-            entry_file = os.path.join(plugin_dir, "main.py")
-            if not os.path.exists(entry_file):
-                entry_file = os.path.join(plugin_dir, "plugin.py")
-            if not os.path.exists(entry_file):
-                raise FileNotFoundError(f"Neither main.py nor plugin.py found in '{plugin_dir}'")
-
-            # 3. Load the entrypoint explicitly without colliding with host_runtime/main.py!
-            spec = importlib.util.spec_from_file_location("dynamic_plugin_entry", entry_file)
-            if spec is None or spec.loader is None:
-                raise ImportError(f"Could not load spec for '{entry_file}'")
-
-            plugin_module = importlib.util.module_from_spec(spec)
-            sys.modules["dynamic_plugin_entry"] = plugin_module
-            spec.loader.exec_module(plugin_module)
-
-            # 4. Invoke the factory function: get_plugin()
-            if not hasattr(plugin_module, 'get_plugin'):
-                raise AttributeError(
-                    f"Entry-point '{entry_file}' must expose a factory function 'get_plugin()'."
-                )
-
-            instance = plugin_module.get_plugin()
-
-            # 5. Contract verification
-            if not isinstance(instance, BaseAudioSourcePlugin):
-                raise TypeError(
-                    f"Plugin instance '{type(instance).__name__}' does not inherit from BaseAudioSourcePlugin."
-                )
-
-            active_plugin = instance
-
-            return jsonify({
-                "success": True,
-                "loaded": active_plugin.name,
-                "id": active_plugin.id,
-                "version": active_plugin.version,
-            }), 200
-
-        except Exception as e:
-            tb = traceback.format_exc()
-            return jsonify({"error": str(e), "traceback": tb}), 500
-
-    @app.route('/get_stream', methods=['POST'])
-    def get_stream():
-        nonlocal active_plugin
-        if not active_plugin:
-            return jsonify({"error": "No plugin currently loaded. Call /load_plugin first."}), 400
-
-        try:
-            data = request.get_json(force=True)
-            track_dict = data.get('track', {})
-            quality = data.get('quality', 'high')
-
-            track = Track.from_dict(track_dict)
-            sources = active_plugin.get_stream(track, quality)
-
-            return jsonify([s.to_dict() for s in sources]), 200
-
-        except Exception as e:
-            tb = traceback.format_exc()
-            return jsonify({"error": str(e), "traceback": tb}), 500
-
-    return app
+    except ValueError as ve:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return jsonify({"success": False, "error": str(ve)}), 400
+    except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
-def start_daemon(port: int = 9765) -> None:
-    print(f"🐍 [HOST] Starting fixed audio source daemon on 0.0.0.0:{port}...", flush=True)
-    app = create_app()
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+@app.route("/resolve_track", methods=["POST"])
+def resolve_track():
+    global _active_plugin
+    if _active_plugin is None:
+        return jsonify({"error": "No audio source plugin loaded in host engine"}), 500
+
+    try:
+        data = request.get_json(force=True) or {}
+        req = ResolveTrackRequest.from_dict(data)
+
+        candidates = _active_plugin.search_candidates(req.track)
+        if not candidates:
+            return jsonify({"error": f"No playable stream candidates found for '{req.track.name}'"}), 404
+
+        primary_candidate = candidates[0]
+        stream = _active_plugin.resolve_stream(primary_candidate.id, req.quality)
+
+        playback = ResolvedTrackPlayback(
+            stream=stream,
+            candidates=candidates,
+            active_candidate_id=primary_candidate.id,
+        )
+
+        return jsonify(playback.to_dict()), 200
+    except ValueError as ve:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/resolve_stream", methods=["POST"])
+def resolve_stream():
+    global _active_plugin
+    if _active_plugin is None:
+        return jsonify({"error": "No audio source plugin loaded in host engine"}), 500
+
+    try:
+        data = request.get_json(force=True) or {}
+        req = ResolveStreamRequest.from_dict(data)
+        stream = _active_plugin.resolve_stream(req.candidate_id, req.quality)
+        return jsonify(stream.to_dict()), 200
+    except ValueError as ve:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return jsonify({"error": str(ve)}), 400
+    except Exception as e:
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        return jsonify({"error": str(e)}), 500
+
+
+def start_daemon(port: Optional[int] = None, host: str = "127.0.0.1"):
+    """Start the Flask host daemon on the assigned port."""
+    if port is None:
+        port = int(os.environ.get("PORT", "8765"))
+    app.run(host=host, port=int(port), debug=False)

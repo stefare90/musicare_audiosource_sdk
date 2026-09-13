@@ -2,7 +2,7 @@
 
 Official multi-language SDK and verification testbed for the **MusicAre** audio source plugin ecosystem.
 
-This monorepo provides the domain models, interfaces, packaging CLI tools, embedded SeriousPython runtime host, Dart client driver, and automated E2E compliance test harness.
+This monorepo provides domain models, interfaces, packaging CLI tools, embedded SeriousPython runtime host, Dart client driver, and automated E2E compliance test harness supporting the **Two-Tier Just-In-Time (JIT)** audio stream resolution architecture.
 
 ---
 
@@ -21,12 +21,14 @@ musicare_audiosource_sdk/
 │   │
 │   └── host_runtime/               # 📌 musicare_python_host_runtime
 │                                      Fixed CPython Flask daemon packaged by SeriousPython.
-│                                      Implements dynamic plugin loading and stream RPC endpoints.
+│                                      Implements dynamic plugin loading and Two-Tier JIT
+│                                      stream RPC endpoints (/resolve_track, /resolve_stream).
 │
 └── dart/
     └── host_sdk/                   # 📦 musicare_dart_host_sdk
         │                              Flutter/Dart package providing AudioSourceClient,
-        │                              domain models, and SeriousPython lifecycle management.
+        │                              domain models (CandidateTrack, ResolvedTrackPlayback),
+        │                              and SeriousPython lifecycle management.
         │
         └── harness/                # 🧪 musicare_dart_harness
                                        Flutter integration test suite to verify third-party
@@ -59,19 +61,19 @@ musicare_audiosource_sdk/
         url: https://github.com/stefare90/musicare_audiosource_sdk.git
         path: dart/host_sdk
   ```
-* **Documentation**: See [`dart/host_sdk/README.md`](dart/host_sdk/README.md) for usage of `AudioSourceClient`.
+* **Documentation**: See [`dart/host_sdk/README.md`](dart/host_sdk/README.md) for usage of `AudioSourceClient` (`resolveTrack`, `resolveStream`).
 
 ---
 
 ### 🧪 For QA & Compliance Testing (E2E Harness)
 * **Goal**: Certify that a compiled `plugin.zip` runs in the real SeriousPython runtime without mobile OS security violations.
-* **App to run**: `dart/host_sdk/harness`
+* **App to run**: `dart/harness`
 * **Execution**:
   ```bash
-  cd dart/host_sdk/harness
+  cd dart/harness
   ./test_plugin.sh /path/to/plugin.zip [linux | <android_device_id>]
   ```
-* **Documentation**: See [`dart/host_sdk/harness/README.md`](dart/host_sdk/harness/README.md).
+* **Documentation**: See [`dart/harness/README.md`](dart/harness/README.md).
 
 ---
 

@@ -144,8 +144,8 @@ class AudioSourceClient {
     return loadPlugin(destination.path, moduleName: moduleName);
   }
 
-  /// Resolves track metadata into an ordered list of playable audio stream sources.
-  Future<List<AudioStreamResponse>> getStream({
+  /// Resolves track metadata via fast search and immediate primary stream resolution (~1.1s).
+  Future<ResolvedTrackPlayback> resolveTrack({
     required String title,
     List<String> artists = const [],
     int durationMs = 0,
@@ -159,14 +159,41 @@ class AudioSourceClient {
 
     final client = _httpClient ?? http.Client();
     final response = await client.post(
-      Uri.parse('http://127.0.0.1:$_port/get_stream'),
+      Uri.parse('http://127.0.0.1:$_port/resolve_track'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'track': {
-          'name': title,
-          'artists': artists.map((a) => {'name': a}).toList(),
-          'durationMs': durationMs,
-        },
+        'track': {'name': title, 'artists': artists, 'duration_ms': durationMs},
+        'quality': quality.toJson(),
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw StreamResolutionException(
+        'Failed to resolve track playback: ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return ResolvedTrackPlayback.fromJson(data);
+  }
+
+  /// Resolves a playable direct audio stream on-demand for a chosen candidate ID (~0.7s).
+  Future<AudioStreamResponse> resolveStream({
+    required String candidateId,
+    AudioQuality quality = AudioQuality.high,
+  }) async {
+    if (!_isStarted) {
+      throw const StreamResolutionException(
+        'Host engine is not running. Call start() and loadPlugin() first.',
+      );
+    }
+
+    final client = _httpClient ?? http.Client();
+    final response = await client.post(
+      Uri.parse('http://127.0.0.1:$_port/resolve_stream'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'candidate_id': candidateId,
         'quality': quality.toJson(),
       }),
     );
@@ -177,12 +204,8 @@ class AudioSourceClient {
       );
     }
 
-    final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
-    return data
-        .map(
-          (json) => AudioStreamResponse.fromJson(json as Map<String, dynamic>),
-        )
-        .toList();
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return AudioStreamResponse.fromJson(data);
   }
 
   /// Terminates SeriousPython runtime and disposes the HTTP client.
