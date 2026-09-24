@@ -1,3 +1,17 @@
+> [!IMPORTANT]
+> **Superseded / archived repository.** This monorepo was the first version of the audio
+> source SDK and is now frozen read-only for historical reference. Its content has been
+> absorbed by **`musicare_plugin_sdk`**: the Python author SDK is now
+> **`musicare_audio_plugin_sdk`**, the runtime is the unified Python host
+> (`python/audio/host_runtime/`, started by the single entry point `python/main.py`, which
+> runs both the audio and metadata daemons), the Dart host SDK is
+> **`musicare_audio_host_sdk`**, the shared lifecycle package is
+> **`musicare_runtime_host`**, the E2E harness lives in `dart/harness/`, and the wire
+> protocol is documented in **`contract/PROTOCOL.md`**.
+> The official audio plugin is **`musicare_audiosource_youtube_plugin`** (release `v1.1.0`,
+> already migrated to the new platform). Everything in this repository stays as it is — as
+> historical reference: no retroactive renames, no files to touch.
+
 # 🎵 MusicAre Audio Source SDK & Tooling Monorepo
 
 Official multi-language SDK and verification testbed for the **MusicAre** audio source plugin ecosystem.
